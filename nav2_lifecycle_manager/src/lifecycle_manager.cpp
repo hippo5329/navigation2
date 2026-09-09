@@ -269,6 +269,11 @@ LifecycleManager::createBondConnection(const std::string & node_name)
   const double timeout_ns =
     std::chrono::duration_cast<std::chrono::nanoseconds>(bond_timeout_).count();
   const double timeout_s = timeout_ns / 1e9;
+  // Only half of bond_timeout is spent waiting for the bond to form; the rest
+  // is left to the heartbeat. Report the duration actually waited, so that a
+  // user sizing bond_timeout against this message is not misled by a figure
+  // twice what was really allowed.
+  const double bond_formation_timeout_s = timeout_s / 2.0;
 
   if (bond_map_.find(node_name) == bond_map_.end() && bond_timeout_.count() > 0.0) {
     bond_map_[node_name] =
@@ -282,9 +287,9 @@ LifecycleManager::createBondConnection(const std::string & node_name)
     {
       RCLCPP_ERROR(
         get_logger(),
-        "Server %s was unable to be reached after %0.2fs by bond. "
-        "This server may be misconfigured.",
-        node_name.c_str(), timeout_s);
+        "Server %s was unable to be reached after %0.2fs by bond "
+        "(half of the %0.2fs bond_timeout). This server may be misconfigured.",
+        node_name.c_str(), bond_formation_timeout_s, timeout_s);
       return false;
     }
     RCLCPP_INFO(get_logger(), "Server %s connected with bond.", node_name.c_str());
